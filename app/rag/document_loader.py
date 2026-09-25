@@ -11,10 +11,8 @@ Handles:
 - Page-level text extraction with metadata
 """
 
-import io
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 import fitz  # PyMuPDF
 
@@ -62,7 +60,7 @@ class LoadedDocument:
     document_id: str
     filename: str
     page_count: int
-    pages: List[PageContent]
+    pages: list[PageContent]
     total_chars: int
     has_scanned_pages: bool
 
@@ -90,9 +88,7 @@ class PDFDocumentLoader:
     def __init__(self, min_page_chars: int = 10):
         self.min_page_chars = min_page_chars
 
-    def load_from_bytes(
-        self, content: bytes, document_id: str, filename: str
-    ) -> LoadedDocument:
+    def load_from_bytes(self, content: bytes, document_id: str, filename: str) -> LoadedDocument:
         """
         Extract text from raw PDF bytes.
 
@@ -113,13 +109,9 @@ class PDFDocumentLoader:
         try:
             doc = fitz.open(stream=content, filetype="pdf")
         except fitz.FileDataError as exc:
-            raise CorruptedDocumentError(
-                f"Cannot parse '{filename}': {exc}"
-            ) from exc
+            raise CorruptedDocumentError(f"Cannot parse '{filename}': {exc}") from exc
         except Exception as exc:
-            raise CorruptedDocumentError(
-                f"Unexpected error opening '{filename}': {exc}"
-            ) from exc
+            raise CorruptedDocumentError(f"Unexpected error opening '{filename}': {exc}") from exc
 
         if doc.is_encrypted:
             doc.close()
@@ -127,34 +119,39 @@ class PDFDocumentLoader:
                 f"'{filename}' is password-protected. Encrypted PDFs are not supported."
             )
 
-        pages: List[PageContent] = []
+        pages: list[PageContent] = []
         has_scanned = False
 
-        for page_idx in range(len(doc)):
-            page = doc[page_idx]
-            text = page.get_text("text")  # plain text extraction
-            char_count = len(text.strip())
-            is_scanned = char_count < self.SCANNED_THRESHOLD_CHARS
+        try:
+            for page_idx in range(len(doc)):
+                page = doc[page_idx]
+                text = page.get_text("text")  # plain text extraction
+                char_count = len(text.strip())
+                is_scanned = char_count < self.SCANNED_THRESHOLD_CHARS
 
-            if is_scanned:
-                has_scanned = True
-                logger.warning(
-                    "possible_scanned_page",
-                    document_id=document_id,
-                    page=page_idx + 1,
-                    chars=char_count,
+                if is_scanned:
+                    has_scanned = True
+                    logger.warning(
+                        "possible_scanned_page",
+                        document_id=document_id,
+                        page=page_idx + 1,
+                        chars=char_count,
+                    )
+
+                pages.append(
+                    PageContent(
+                        page_number=page_idx + 1,
+                        text=text,
+                        char_count=char_count,
+                        is_scanned=is_scanned,
+                    )
                 )
-
-            pages.append(
-                PageContent(
-                    page_number=page_idx + 1,
-                    text=text,
-                    char_count=char_count,
-                    is_scanned=is_scanned,
-                )
-            )
-
-        doc.close()
+        except Exception as exc:
+            doc.close()
+            raise CorruptedDocumentError(f"Cannot extract pages from '{filename}': {exc}") from exc
+        finally:
+            if not doc.is_closed:
+                doc.close()
 
         total_chars = sum(p.char_count for p in pages)
 

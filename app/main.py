@@ -13,7 +13,7 @@ FastAPI application factory and startup lifecycle.
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,10 +30,10 @@ configure_logging()
 logger = get_logger(__name__)
 
 # Global application state
-_APP_STATE: Dict[str, Any] = {}
+_APP_STATE: dict[str, Any] = {}
 
 
-def get_app_state() -> Dict[str, Any]:
+def get_app_state() -> dict[str, Any]:
     """Return the shared application state dictionary."""
     return _APP_STATE
 
@@ -64,32 +64,39 @@ async def lifespan(app: FastAPI):
     data_path = settings.data_path
     data_path.mkdir(parents=True, exist_ok=True)
 
-    # Initialise the RAG pipeline (may raise if Qdrant is unreachable)
+    # Initialise the RAG pipeline (may fail if Qdrant is unreachable or API key missing)
     from app.rag.pipeline import RAGPipeline
-    from app.services.document_service import DocumentService
     from app.services.chat_service import ChatService
+    from app.services.document_service import DocumentService
 
-    try:
-        pipeline = RAGPipeline()
-    except Exception as exc:
-        logger.error("pipeline_init_failed", error=str(exc))
-        # Allow app to start even if Qdrant is temporarily down
-        # Health endpoint will report unhealthy
-        pipeline = None
+    if _APP_STATE.get("pipeline") is None:
+        try:
+            pipeline = RAGPipeline()
+        except Exception as exc:
+            logger.warning(
+                "pipeline_init_skipped",
+                error=str(exc),
+                message="Vector DB or OpenAI not ready. App started in degraded mode.",
+            )
+            pipeline = None
 
-    doc_service = DocumentService(pipeline) if pipeline else None
-    chat_service = ChatService(pipeline) if pipeline else None
+        doc_service = DocumentService(pipeline) if pipeline else None
+        chat_service = ChatService(pipeline) if pipeline else None
 
-    _APP_STATE.update(
-        {
-            "pipeline": pipeline,
-            "document_service": doc_service,
-            "chat_service": chat_service,
-            "start_time": time.monotonic(),
-            "total_queries": 0,
-            "avg_latency_ms": 0.0,
-        }
-    )
+        _APP_STATE.update(
+            {
+                "pipeline": pipeline,
+                "document_service": doc_service,
+                "chat_service": chat_service,
+            }
+        )
+
+    if "start_time" not in _APP_STATE:
+        _APP_STATE["start_time"] = time.monotonic()
+    if "total_queries" not in _APP_STATE:
+        _APP_STATE["total_queries"] = 0
+    if "avg_latency_ms" not in _APP_STATE:
+        _APP_STATE["avg_latency_ms"] = 0.0
 
     logger.info("application_ready", env=settings.app_env, port=settings.app_port)
 

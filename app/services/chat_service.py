@@ -4,9 +4,6 @@ app/services/chat_service.py
 Business logic layer for the chat/Q&A interface.
 """
 
-import time
-from typing import List, Optional
-
 from app.core.logging import get_logger
 from app.models.schemas import ChatRequest, ChatResponse
 from app.rag.pipeline import RAGPipeline

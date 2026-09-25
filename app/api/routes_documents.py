@@ -8,8 +8,6 @@ FastAPI routes for document management:
   DELETE /api/documents/{document_id}
 """
 
-import time
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.core.logging import get_logger
@@ -29,8 +27,15 @@ router = APIRouter(prefix="/api/documents", tags=["Documents"])
 def get_document_service() -> DocumentService:
     """Dependency — returns the shared DocumentService from app state."""
     from app.main import get_app_state
+
     state = get_app_state()
-    return state["document_service"]
+    service = state.get("document_service")
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document service is unavailable. Check that Qdrant is running and OPENAI_API_KEY is set.",
+        )
+    return service
 
 
 @router.post(
@@ -76,23 +81,23 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
-        )
+        ) from exc
     except CorruptedDocumentError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
-        )
+        ) from exc
     except DocumentLoadError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
-        )
+        ) from exc
     except Exception as exc:
         logger.exception("upload_unexpected_error", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document ingestion failed. Please try again.",
-        )
+        ) from exc
 
 
 @router.get(

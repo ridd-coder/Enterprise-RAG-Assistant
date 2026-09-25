@@ -3,7 +3,6 @@
 Unit tests for security utility functions.
 """
 
-import pytest
 from app.core.security import compute_document_id, sanitise_filename
 
 

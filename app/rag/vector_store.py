@@ -12,11 +12,10 @@ Implements:
 """
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
-from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -46,7 +45,7 @@ class VectorStoreConnectionError(VectorStoreError):
 class SearchResult:
     """A single result returned from vector similarity search."""
 
-    def __init__(self, payload: Dict[str, Any], score: float, point_id: str):
+    def __init__(self, payload: dict[str, Any], score: float, point_id: str):
         self.payload = payload
         self.score = score
         self.point_id = point_id
@@ -90,7 +89,7 @@ class QdrantVectorStore:
         self._vector_size = vector_size
 
         try:
-            client_kwargs: Dict[str, Any] = {
+            client_kwargs: dict[str, Any] = {
                 "host": settings.qdrant_host,
                 "port": settings.qdrant_port,
             }
@@ -137,7 +136,7 @@ class QdrantVectorStore:
             vector_size=self._vector_size,
         )
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Return collection info for the health endpoint."""
         try:
             info = self._client.get_collection(self._collection)
@@ -145,9 +144,11 @@ class QdrantVectorStore:
                 "status": "healthy",
                 "collection": self._collection,
                 "vectors_count": info.vectors_count or 0,
-                "host": self._client._client._host
-                if hasattr(self._client._client, "_host")
-                else "qdrant",
+                "host": (
+                    self._client._client._host
+                    if hasattr(self._client._client, "_host")
+                    else "qdrant"
+                ),
             }
         except Exception as exc:
             logger.error("qdrant_health_check_failed", error=str(exc))
@@ -165,8 +166,8 @@ class QdrantVectorStore:
 
     def upsert_chunks(
         self,
-        chunks: List[DocumentChunk],
-        embeddings: List[List[float]],
+        chunks: list[DocumentChunk],
+        embeddings: list[list[float]],
     ) -> int:
         """
         Insert or update chunks in Qdrant.
@@ -183,7 +184,7 @@ class QdrantVectorStore:
             )
 
         points = []
-        for chunk, embedding in zip(chunks, embeddings):
+        for chunk, embedding in zip(chunks, embeddings, strict=False):
             # Deterministic UUID from chunk_id string
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk.chunk_id))
 
@@ -215,11 +216,11 @@ class QdrantVectorStore:
 
     def search(
         self,
-        query_vector: List[float],
+        query_vector: list[float],
         top_k: int = 5,
-        filter_document_ids: Optional[List[str]] = None,
-        score_threshold: Optional[float] = None,
-    ) -> List[SearchResult]:
+        filter_document_ids: list[str] | None = None,
+        score_threshold: float | None = None,
+    ) -> list[SearchResult]:
         """
         Perform cosine similarity search.
 
@@ -286,7 +287,7 @@ class QdrantVectorStore:
             Estimated number of points deleted.
         """
         try:
-            result = self._client.delete(
+            self._client.delete(
                 collection_name=self._collection,
                 points_selector=qdrant_models.FilterSelector(
                     filter=qdrant_models.Filter(
@@ -303,12 +304,8 @@ class QdrantVectorStore:
             logger.info("document_deleted_from_qdrant", document_id=document_id)
             return 1  # operation success
         except Exception as exc:
-            logger.error(
-                "qdrant_delete_failed", document_id=document_id, error=str(exc)
-            )
-            raise VectorStoreError(
-                f"Failed to delete document {document_id}: {exc}"
-            ) from exc
+            logger.error("qdrant_delete_failed", document_id=document_id, error=str(exc))
+            raise VectorStoreError(f"Failed to delete document {document_id}: {exc}") from exc
 
     def get_document_chunk_count(self, document_id: str) -> int:
         """Count the number of vectors stored for a document."""

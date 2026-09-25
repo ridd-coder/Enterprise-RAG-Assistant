@@ -7,12 +7,10 @@ All metrics are deterministic — no LLM calls in metrics computation.
 (LLM-as-judge can be added as an optional advanced feature.)
 """
 
-from typing import List
-
 
 def compute_retrieval_hit(
-    retrieved_sources: List[str],
-    expected_sources: List[str],
+    retrieved_sources: list[str],
+    expected_sources: list[str],
 ) -> bool:
     """
     Retrieval Hit: Did we retrieve at least one expected source document?
@@ -39,9 +37,30 @@ def compute_answer_correctness(
     interpretable baseline.
     """
     stopwords = {
-        "the", "a", "an", "is", "are", "was", "were", "in", "of",
-        "to", "for", "and", "or", "that", "it", "this", "with",
-        "be", "as", "at", "by", "from", "on", "not",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "in",
+        "of",
+        "to",
+        "for",
+        "and",
+        "or",
+        "that",
+        "it",
+        "this",
+        "with",
+        "be",
+        "as",
+        "at",
+        "by",
+        "from",
+        "on",
+        "not",
     }
 
     expected_words = {
@@ -61,8 +80,8 @@ def compute_answer_correctness(
 
 
 def compute_citation_accuracy(
-    retrieved_sources: List[str],
-    expected_sources: List[str],
+    retrieved_sources: list[str],
+    expected_sources: list[str],
 ) -> bool:
     """
     Citation Accuracy: Did we cite at least one expected source?
@@ -73,8 +92,8 @@ def compute_citation_accuracy(
 
 
 def compute_precision_at_k(
-    retrieved_sources: List[str],
-    expected_sources: List[str],
+    retrieved_sources: list[str],
+    expected_sources: list[str],
 ) -> float:
     """
     Precision@K: Fraction of retrieved sources that are relevant.
@@ -88,8 +107,8 @@ def compute_precision_at_k(
 
 
 def compute_recall_at_k(
-    retrieved_sources: List[str],
-    expected_sources: List[str],
+    retrieved_sources: list[str],
+    expected_sources: list[str],
 ) -> float:
     """
     Recall@K: Fraction of expected sources that were retrieved.

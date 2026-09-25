@@ -9,9 +9,6 @@ Keeping prompts separate from generation logic allows:
 - Easy swap of prompting strategy
 """
 
-from string import Template
-from typing import List
-
 from app.rag.vector_store import SearchResult
 
 # ======================================================================
@@ -36,7 +33,8 @@ STRICT RULES you must follow:
 # Context builder
 # ======================================================================
 
-def build_context_block(chunks: List[SearchResult]) -> str:
+
+def build_context_block(chunks: list[SearchResult]) -> str:
     """
     Format retrieved chunks into a numbered context block for the LLM.
 
@@ -52,9 +50,7 @@ def build_context_block(chunks: List[SearchResult]) -> str:
 
     parts = []
     for i, chunk in enumerate(chunks, start=1):
-        parts.append(
-            f"[{i}] Source: {chunk.filename}, Page {chunk.page_number}\n{chunk.text}"
-        )
+        parts.append(f"[{i}] Source: {chunk.filename}, Page {chunk.page_number}\n{chunk.text}")
 
     return "\n\n".join(parts)
 
@@ -62,7 +58,7 @@ def build_context_block(chunks: List[SearchResult]) -> str:
 def build_user_message(
     question: str,
     context: str,
-    conversation_history: List[dict] | None = None,
+    conversation_history: list[dict] | None = None,
 ) -> str:
     """
     Build the full user message including context and the question.
@@ -79,9 +75,9 @@ def build_user_message(
 
 def build_messages(
     question: str,
-    chunks: List[SearchResult],
-    conversation_history: List[dict] | None = None,
-) -> List[dict]:
+    chunks: list[SearchResult],
+    conversation_history: list[dict] | None = None,
+) -> list[dict]:
     """
     Assemble the complete messages list for the OpenAI chat API.
 

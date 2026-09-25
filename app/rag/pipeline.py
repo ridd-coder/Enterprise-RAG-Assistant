@@ -15,10 +15,7 @@ It is the ONLY place that combines multiple RAG components.
 
 import time
 import uuid
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
-from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.security import compute_document_id, sanitise_filename
 from app.models.schemas import (
@@ -42,7 +39,7 @@ logger = get_logger(__name__)
 # In-memory conversation store (replace with Redis/DB for multi-user)
 # ======================================================================
 
-_CONVERSATION_STORE: Dict[str, List[ConversationMessage]] = {}
+_CONVERSATION_STORE: dict[str, list[ConversationMessage]] = {}
 _MAX_HISTORY_TURNS = 10  # Keep last 10 user+assistant pairs
 
 
@@ -59,17 +56,13 @@ class RAGPipeline:
     """
 
     def __init__(self):
-        settings = get_settings()
-
         # --- Document processing ---
         self._loader = PDFDocumentLoader()
         self._chunker = DocumentChunker()
 
         # --- AI components ---
         self._embedder = EmbeddingService()
-        self._vector_store = QdrantVectorStore(
-            vector_size=self._embedder.vector_size
-        )
+        self._vector_store = QdrantVectorStore(vector_size=self._embedder.vector_size)
         self._retriever = RAGRetriever(
             embedding_service=self._embedder,
             vector_store=self._vector_store,
@@ -164,9 +157,9 @@ class RAGPipeline:
     def query(
         self,
         question: str,
-        conversation_id: Optional[str] = None,
-        top_k: Optional[int] = None,
-        document_ids: Optional[List[str]] = None,
+        conversation_id: str | None = None,
+        top_k: int | None = None,
+        document_ids: list[str] | None = None,
     ) -> ChatResponse:
         """
         Full RAG query pipeline: question → answer with sources.
@@ -211,8 +204,8 @@ class RAGPipeline:
         )
 
         # Build source references
-        sources: List[SourceReference] = []
-        retrieved_chunks: List[RetrievedChunk] = []
+        sources: list[SourceReference] = []
+        retrieved_chunks: list[RetrievedChunk] = []
 
         seen_sources = set()
         for chunk in chunks:
@@ -244,9 +237,7 @@ class RAGPipeline:
 
         # Persist conversation history
         history.append(ConversationMessage(role="user", content=question))
-        history.append(
-            ConversationMessage(role="assistant", content=gen_result.answer)
-        )
+        history.append(ConversationMessage(role="assistant", content=gen_result.answer))
         # Trim to max history window
         max_messages = _MAX_HISTORY_TURNS * 2
         _CONVERSATION_STORE[conversation_id] = history[-max_messages:]

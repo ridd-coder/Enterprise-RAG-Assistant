@@ -16,9 +16,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.core.security import compute_document_id, sanitise_filename
+from app.core.security import sanitise_filename
 from app.rag.pipeline import RAGPipeline
 
 configure_logging()

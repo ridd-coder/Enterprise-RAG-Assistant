@@ -10,7 +10,6 @@ Security utilities:
 import hashlib
 import os
 from pathlib import Path
-from typing import Optional
 
 from fastapi import HTTPException, UploadFile, status
 
@@ -79,7 +78,5 @@ def sanitise_filename(filename: str) -> str:
     # Strip directory components
     filename = os.path.basename(filename)
     # Replace anything that isn't alphanumeric, dash, underscore, or dot
-    safe = "".join(
-        c if c.isalnum() or c in ("-", "_", ".") else "_" for c in filename
-    )
+    safe = "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in filename)
     return safe or "uploaded_file"

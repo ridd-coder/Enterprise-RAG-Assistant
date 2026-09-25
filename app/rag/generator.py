@@ -9,7 +9,6 @@ Do not scatter OpenAI calls elsewhere.
 
 import time
 from dataclasses import dataclass
-from typing import List, Optional
 
 from openai import APIConnectionError, APIStatusError, OpenAI, RateLimitError
 from tenacity import (
@@ -47,7 +46,7 @@ class GenerationResult:
 
     answer: str
     model_used: str
-    tokens_used: Optional[int]
+    tokens_used: int | None
     latency_ms: int
 
 
@@ -57,8 +56,7 @@ class GenerationResult:
 
 # Sentinel string that indicates no usable context was retrieved
 NO_CONTEXT_ANSWER = (
-    "I could not find sufficient information in the uploaded documents "
-    "to answer this question."
+    "I could not find sufficient information in the uploaded documents " "to answer this question."
 )
 
 
@@ -72,7 +70,8 @@ class LLMGenerator:
 
     def __init__(self):
         settings = get_settings()
-        self._client = OpenAI(api_key=settings.openai_api_key)
+        api_key = settings.require_openai_key()
+        self._client = OpenAI(api_key=api_key)
         self._model = settings.openai_model
         self._max_tokens = settings.openai_max_tokens
         self._temperature = settings.openai_temperature
@@ -87,8 +86,8 @@ class LLMGenerator:
     def generate(
         self,
         question: str,
-        chunks: List[SearchResult],
-        conversation_history: Optional[List[dict]] = None,
+        chunks: list[SearchResult],
+        conversation_history: list[dict] | None = None,
     ) -> GenerationResult:
         """
         Generate an answer grounded in the retrieved chunks.
@@ -169,10 +168,10 @@ class LLMGenerator:
                 max_tokens=self._max_tokens,
                 temperature=self._temperature,
             )
-        except RateLimitError as exc:
+        except RateLimitError:
             logger.warning("openai_rate_limited_generation")
             raise
-        except APIConnectionError as exc:
+        except APIConnectionError:
             logger.warning("openai_connection_error_generation")
             raise
         except APIStatusError as exc:

@@ -14,7 +14,6 @@ The retriever does NOT call the LLM — it is purely the "R" in RAG.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -31,7 +30,7 @@ class RetrievalContext:
     """
 
     query: str
-    chunks: List[SearchResult]
+    chunks: list[SearchResult]
     total_retrieved: int
     passed_threshold: int
     min_score_used: float
@@ -53,9 +52,9 @@ class RAGRetriever:
     def retrieve(
         self,
         query: str,
-        top_k: Optional[int] = None,
-        min_score: Optional[float] = None,
-        document_ids: Optional[List[str]] = None,
+        top_k: int | None = None,
+        min_score: float | None = None,
+        document_ids: list[str] | None = None,
     ) -> RetrievalContext:
         """
         Retrieve the top-k most relevant chunks for a query.

@@ -11,7 +11,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -42,7 +41,7 @@ def print_report(report) -> None:
         status = "✓" if r.answer_correct else "✗"
         print(f"  {status}  {r.question[:60]}")
         if not r.retrieval_hit:
-            print(f"     ⚠ No expected source retrieved")
+            print("     ⚠ No expected source retrieved")
     print()
 
 

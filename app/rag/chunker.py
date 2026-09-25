@@ -11,13 +11,12 @@ Strategy:
 """
 
 from dataclasses import dataclass, field
-from typing import List
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.rag.document_loader import LoadedDocument, PageContent
+from app.rag.document_loader import LoadedDocument
 
 logger = get_logger(__name__)
 
@@ -35,12 +34,12 @@ class DocumentChunk:
     The chunk_id is globally unique and deterministic.
     """
 
-    chunk_id: str           # "{document_id}_p{page}_c{index}"
+    chunk_id: str  # "{document_id}_p{page}_c{index}"
     document_id: str
     filename: str
     page_number: int
-    chunk_index: int        # index within the whole document
-    page_chunk_index: int   # index within the page
+    chunk_index: int  # index within the whole document
+    page_chunk_index: int  # index within the page
     text: str
     char_count: int = field(init=False)
 
@@ -88,13 +87,13 @@ class DocumentChunker:
             is_separator_regex=False,
         )
 
-    def chunk_document(self, document: LoadedDocument) -> List[DocumentChunk]:
+    def chunk_document(self, document: LoadedDocument) -> list[DocumentChunk]:
         """
         Split a LoadedDocument into a flat list of DocumentChunks.
 
         Each chunk knows its document, filename, and exact page number.
         """
-        all_chunks: List[DocumentChunk] = []
+        all_chunks: list[DocumentChunk] = []
         global_chunk_index = 0
 
         for page in document.pages:
@@ -114,11 +113,7 @@ class DocumentChunker:
                 if not chunk_text:
                     continue
 
-                chunk_id = (
-                    f"{document.document_id}"
-                    f"_p{page.page_number}"
-                    f"_c{local_idx}"
-                )
+                chunk_id = f"{document.document_id}" f"_p{page.page_number}" f"_c{local_idx}"
 
                 chunk = DocumentChunk(
                     chunk_id=chunk_id,

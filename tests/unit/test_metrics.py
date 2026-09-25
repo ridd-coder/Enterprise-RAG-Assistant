@@ -3,10 +3,8 @@
 Unit tests for evaluation metric functions.
 """
 
-import pytest
 from app.evaluation.metrics import (
     compute_answer_correctness,
-    compute_citation_accuracy,
     compute_precision_at_k,
     compute_recall_at_k,
     compute_retrieval_hit,

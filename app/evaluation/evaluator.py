@@ -14,7 +14,6 @@ Evaluates:
 import json
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from app.core.logging import get_logger
 from app.evaluation.metrics import (
@@ -23,7 +22,6 @@ from app.evaluation.metrics import (
     compute_retrieval_hit,
 )
 from app.models.schemas import (
-    ChatRequest,
     EvaluationQuestion,
     EvaluationReport,
     EvaluationResult,
@@ -41,12 +39,12 @@ class RAGEvaluator:
     def __init__(self, pipeline: RAGPipeline):
         self._pipeline = pipeline
 
-    def load_dataset(self, dataset_path: Path) -> List[EvaluationQuestion]:
+    def load_dataset(self, dataset_path: Path) -> list[EvaluationQuestion]:
         """Load evaluation questions from a JSON file."""
         if not dataset_path.exists():
             raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
-        with open(dataset_path, "r", encoding="utf-8") as f:
+        with open(dataset_path, encoding="utf-8") as f:
             raw = json.load(f)
 
         questions = [EvaluationQuestion(**item) for item in raw]
@@ -56,7 +54,7 @@ class RAGEvaluator:
     def run(
         self,
         dataset_path: Path,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
     ) -> EvaluationReport:
         """
         Execute a full evaluation run.
@@ -69,7 +67,7 @@ class RAGEvaluator:
             EvaluationReport with all metrics.
         """
         questions = self.load_dataset(dataset_path)
-        results: List[EvaluationResult] = []
+        results: list[EvaluationResult] = []
         total_latency = 0
 
         for i, q in enumerate(questions):

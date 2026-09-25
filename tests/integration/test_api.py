@@ -7,10 +7,14 @@ by mocking the RAGPipeline and services.
 """
 
 import io
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
+from app.api.routes_chat import get_chat_service
+from app.api.routes_documents import get_document_service
+from app.api.routes_health import get_rag_pipeline
 from app.main import app, get_app_state
 from app.models.schemas import (
     ChatResponse,
@@ -36,6 +40,7 @@ def mock_pipeline():
 @pytest.fixture
 def mock_doc_service(mock_pipeline):
     from app.services.document_service import DocumentService
+
     svc = MagicMock(spec=DocumentService)
     svc.upload_document.return_value = DocumentUploadResponse(
         document_id="abc123",
@@ -53,6 +58,7 @@ def mock_doc_service(mock_pipeline):
 @pytest.fixture
 def mock_chat_service():
     from app.services.chat_service import ChatService
+
     svc = MagicMock(spec=ChatService)
     svc.ask.return_value = ChatResponse(
         answer="Employees receive 20 days annual leave.",
@@ -78,7 +84,7 @@ def mock_chat_service():
 
 @pytest.fixture
 def client(mock_pipeline, mock_doc_service, mock_chat_service):
-    """TestClient with mocked app state."""
+    """TestClient with mocked app state and dependency overrides."""
     state = get_app_state()
     state["pipeline"] = mock_pipeline
     state["document_service"] = mock_doc_service
@@ -87,8 +93,14 @@ def client(mock_pipeline, mock_doc_service, mock_chat_service):
     state["total_queries"] = 0
     state["avg_latency_ms"] = 0.0
 
+    app.dependency_overrides[get_document_service] = lambda: mock_doc_service
+    app.dependency_overrides[get_chat_service] = lambda: mock_chat_service
+    app.dependency_overrides[get_rag_pipeline] = lambda: mock_pipeline
+
     with TestClient(app) as c:
         yield c
+
+    app.dependency_overrides.clear()
 
 
 class TestHealthEndpoints:

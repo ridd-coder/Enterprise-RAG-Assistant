@@ -7,10 +7,13 @@ All values are loaded from environment variables / .env file.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ConfigurationError(Exception):
+    """Raised when required configuration (e.g. API keys) is missing or invalid."""
 
 
 class Settings(BaseSettings):
@@ -35,11 +38,24 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # OpenAI
     # ------------------------------------------------------------------
-    openai_api_key: str = Field(..., description="OpenAI API key — required")
+    openai_api_key: str = Field(
+        default="",
+        description="OpenAI API key — required for embedding and generation",
+    )
     openai_model: str = Field(default="gpt-4o-mini")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
     openai_max_tokens: int = Field(default=1024)
     openai_temperature: float = Field(default=0.0)
+
+    def require_openai_key(self) -> str:
+        """Validate and return OpenAI API key, raising ConfigurationError if missing."""
+        key = self.openai_api_key.strip()
+        if not key:
+            raise ConfigurationError(
+                "OPENAI_API_KEY is not configured. Please set OPENAI_API_KEY in your .env "
+                "file or as an environment variable to enable embedding and generation."
+            )
+        return key
 
     # ------------------------------------------------------------------
     # Qdrant
@@ -62,7 +78,7 @@ class Settings(BaseSettings):
     # Document processing
     # ------------------------------------------------------------------
     max_file_size_mb: int = Field(default=50)
-    allowed_extensions: List[str] = Field(default=["pdf"])
+    allowed_extensions: list[str] = Field(default=["pdf"])
     chunk_size: int = Field(default=1000)
     chunk_overlap: int = Field(default=200)
     data_dir: str = Field(default="data/documents")
@@ -77,9 +93,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # CORS
     # ------------------------------------------------------------------
-    cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173"]
-    )
+    cors_origins: list[str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
 
     @field_validator("allowed_extensions", mode="before")
     @classmethod

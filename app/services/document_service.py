@@ -7,25 +7,21 @@ Separates HTTP concerns (FastAPI routes) from domain logic.
 Persists document metadata in PostgreSQL (or an in-memory store for dev).
 """
 
-import time
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from app.core.logging import get_logger
-from app.core.security import validate_file_size
 from app.models.schemas import (
     DocumentDeleteResponse,
     DocumentInfo,
     DocumentListResponse,
     DocumentUploadResponse,
 )
-from app.rag.document_loader import DocumentLoadError
 from app.rag.pipeline import RAGPipeline
 
 logger = get_logger(__name__)
 
 # Simple in-memory store (replace with PostgreSQL in production)
-_DOCUMENT_REGISTRY: Dict[str, DocumentInfo] = {}
+_DOCUMENT_REGISTRY: dict[str, DocumentInfo] = {}
 
 
 class DocumentService:
@@ -73,6 +69,7 @@ class DocumentService:
         """Delete a document from the vector store and registry."""
         if document_id not in _DOCUMENT_REGISTRY:
             from fastapi import HTTPException, status
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Document '{document_id}' not found.",

@@ -22,8 +22,15 @@ router = APIRouter(prefix="/api", tags=["Chat"])
 def get_chat_service() -> ChatService:
     """Dependency — returns the shared ChatService from app state."""
     from app.main import get_app_state
+
     state = get_app_state()
-    return state["chat_service"]
+    service = state.get("chat_service")
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Chat service is unavailable. Check that Qdrant is running and OPENAI_API_KEY is set.",
+        )
+    return service
 
 
 @router.post(
@@ -50,19 +57,19 @@ async def chat(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The vector database is currently unavailable.",
-        )
+        ) from exc
     except GenerationError as exc:
         logger.error("chat_generation_error", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The LLM service returned an error. Please try again.",
-        )
+        ) from exc
     except Exception as exc:
         logger.exception("chat_unexpected_error", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again.",
-        )
+        ) from exc
 
 
 @router.get(
@@ -72,16 +79,18 @@ async def chat(
 )
 async def get_metrics() -> MetricsResponse:
     """Return basic usage metrics for the dashboard."""
-    from app.main import get_app_state
     import time
+
+    from app.main import get_app_state
 
     state = get_app_state()
     uptime = time.monotonic() - state.get("start_time", time.monotonic())
-    doc_service = state["document_service"]
+    doc_service = state.get("document_service")
+    total_docs = doc_service.get_document_count() if doc_service else 0
 
     return MetricsResponse(
-        total_documents=doc_service.get_document_count(),
-        total_chunks=0,   # extend: query Qdrant for total count
+        total_documents=total_docs,
+        total_chunks=0,  # extend: query Qdrant for total count
         total_queries=state.get("total_queries", 0),
         avg_query_latency_ms=state.get("avg_latency_ms", 0.0),
         uptime_seconds=uptime,

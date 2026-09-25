@@ -9,11 +9,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.core.config import get_settings
-
 
 # ======================================================================
 # Base
@@ -40,9 +39,7 @@ class DocumentRecord(Base):
     page_count: Mapped[int] = mapped_column(Integer, nullable=False)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
-    )
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Relationships
     conversations: Mapped[list["ConversationRecord"]] = relationship(
@@ -60,15 +57,11 @@ class ConversationRecord(Base):
 
     __tablename__ = "conversations"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     document: Mapped["DocumentRecord | None"] = relationship(
         "DocumentRecord", back_populates="conversations"
@@ -90,9 +83,7 @@ class MessageRecord(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # user | assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)
     sources_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     conversation: Mapped["ConversationRecord"] = relationship(
         "ConversationRecord", back_populates="messages"

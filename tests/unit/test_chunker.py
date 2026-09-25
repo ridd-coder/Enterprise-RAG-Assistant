@@ -3,15 +3,13 @@
 Unit tests for the DocumentChunker.
 """
 
-import pytest
-from app.rag.chunker import DocumentChunk, DocumentChunker
+from app.rag.chunker import DocumentChunker
 from app.rag.document_loader import LoadedDocument, PageContent
 
 
 def make_loaded_doc(pages_text: list[str], doc_id: str = "test123") -> LoadedDocument:
     pages = [
-        PageContent(page_number=i + 1, text=t, char_count=len(t))
-        for i, t in enumerate(pages_text)
+        PageContent(page_number=i + 1, text=t, char_count=len(t)) for i, t in enumerate(pages_text)
     ]
     return LoadedDocument(
         document_id=doc_id,
@@ -78,14 +76,19 @@ class TestDocumentChunker:
         payload = chunk.to_payload()
 
         required_keys = {
-            "chunk_id", "document_id", "filename",
-            "page_number", "chunk_index", "text", "char_count",
+            "chunk_id",
+            "document_id",
+            "filename",
+            "page_number",
+            "chunk_index",
+            "text",
+            "char_count",
         }
         assert required_keys.issubset(set(payload.keys()))
 
     def test_large_document_chunked(self):
         """A document larger than chunk_size should produce multiple chunks."""
-        long_text = "This is sentence number {}. ".format(1) * 200
+        long_text = f"This is sentence number {1}. " * 200
         doc = make_loaded_doc([long_text])
         chunker = DocumentChunker(chunk_size=200, chunk_overlap=20)
         chunks = chunker.chunk_document(doc)

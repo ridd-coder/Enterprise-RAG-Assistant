@@ -6,11 +6,8 @@ These are the public contract — no internal implementation details here.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ======================================================================
 # Shared / Base
@@ -58,7 +55,7 @@ class DocumentInfo(BaseModel):
 
 
 class DocumentListResponse(BaseModel):
-    documents: List[DocumentInfo]
+    documents: list[DocumentInfo]
     total: int
 
 
@@ -76,9 +73,9 @@ class ChatRequest(BaseModel):
     """Incoming chat question from the user."""
 
     question: str = Field(..., min_length=1, max_length=2000)
-    conversation_id: Optional[str] = Field(default=None)
-    top_k: Optional[int] = Field(default=None, ge=1, le=20)
-    document_ids: Optional[List[str]] = Field(
+    conversation_id: str | None = Field(default=None)
+    top_k: int | None = Field(default=None, ge=1, le=20)
+    document_ids: list[str] | None = Field(
         default=None,
         description="Restrict retrieval to specific document IDs",
     )
@@ -116,14 +113,16 @@ class RetrievedChunk(BaseModel):
 class ChatResponse(BaseModel):
     """Full response to a chat question."""
 
+    model_config = {"protected_namespaces": ()}
+
     answer: str
     conversation_id: str
-    sources: List[SourceReference]
-    retrieved_chunks: List[RetrievedChunk]
+    sources: list[SourceReference]
+    retrieved_chunks: list[RetrievedChunk]
     chunks_retrieved: int
     latency_ms: int
     model_used: str
-    tokens_used: Optional[int] = None
+    tokens_used: int | None = None
 
 
 # ======================================================================
@@ -145,7 +144,7 @@ class ConversationMessage(BaseModel):
 class EvaluationQuestion(BaseModel):
     question: str
     expected_answer: str
-    expected_sources: List[str]
+    expected_sources: list[str]
 
 
 class EvaluationResult(BaseModel):
@@ -156,8 +155,8 @@ class EvaluationResult(BaseModel):
     answer_correct: bool
     citation_correct: bool
     latency_ms: int
-    retrieved_sources: List[str]
-    expected_sources: List[str]
+    retrieved_sources: list[str]
+    expected_sources: list[str]
 
 
 class EvaluationReport(BaseModel):
@@ -166,7 +165,7 @@ class EvaluationReport(BaseModel):
     answer_correctness: float
     citation_accuracy: float
     avg_latency_ms: float
-    results: List[EvaluationResult]
+    results: list[EvaluationResult]
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

@@ -7,12 +7,22 @@ Health check endpoints:
   GET /api/health/vector-db
 """
 
-from fastapi import APIRouter
+from typing import Any
+
+from fastapi import APIRouter, Depends
 
 from app.core.config import get_settings
 from app.models.schemas import HealthStatus, VectorDBHealth
 
 router = APIRouter(prefix="/api/health", tags=["Health"])
+
+
+def get_rag_pipeline() -> Any:
+    """Dependency — returns the shared RAGPipeline from app state."""
+    from app.main import get_app_state
+
+    state = get_app_state()
+    return state.get("pipeline")
 
 
 @router.get(
@@ -35,17 +45,25 @@ async def health() -> HealthStatus:
     response_model=VectorDBHealth,
     summary="Qdrant vector database health check",
 )
-async def vector_db_health() -> VectorDBHealth:
+async def vector_db_health(
+    pipeline: Any = Depends(get_rag_pipeline),
+) -> VectorDBHealth:
     """Checks connectivity to Qdrant and reports collection status."""
-    from app.main import get_app_state
+    settings = get_settings()
 
-    state = get_app_state()
-    pipeline = state["pipeline"]
+    if pipeline is None:
+        return VectorDBHealth(
+            status="unhealthy",
+            collection=settings.qdrant_collection,
+            vectors_count=0,
+            host=settings.qdrant_host,
+        )
+
     info = pipeline.vector_store_health()
 
     return VectorDBHealth(
         status=info.get("status", "unknown"),
-        collection=info.get("collection", ""),
+        collection=info.get("collection", settings.qdrant_collection),
         vectors_count=info.get("vectors_count", 0),
-        host=info.get("host", "unknown"),
+        host=info.get("host", settings.qdrant_host),
     )
