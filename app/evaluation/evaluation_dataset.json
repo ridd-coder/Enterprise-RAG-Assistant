@@ -1,0 +1,27 @@
+[
+    {
+        "question": "What is the annual leave entitlement?",
+        "expected_answer": "20 days",
+        "expected_sources": ["leave_policy.pdf"]
+    },
+    {
+        "question": "How many sick leave days are employees entitled to?",
+        "expected_answer": "10 days",
+        "expected_sources": ["leave_policy.pdf"]
+    },
+    {
+        "question": "What is the probation period for new employees?",
+        "expected_answer": "3 months",
+        "expected_sources": ["employee_handbook.pdf"]
+    },
+    {
+        "question": "How do I submit a leave request?",
+        "expected_answer": "leave request form",
+        "expected_sources": ["leave_policy.pdf"]
+    },
+    {
+        "question": "What is the insurance deductible amount?",
+        "expected_answer": "deductible",
+        "expected_sources": ["insurance_policy.pdf"]
+    }
+]
