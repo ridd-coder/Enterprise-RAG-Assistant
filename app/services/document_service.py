@@ -9,7 +9,11 @@ Persists document metadata in PostgreSQL (or an in-memory store for dev).
 
 from datetime import datetime
 
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.logging import get_logger
+from app.models.database import DocumentRecord
 from app.models.schemas import (
     DocumentDeleteResponse,
     DocumentInfo,
@@ -20,9 +24,6 @@ from app.rag.pipeline import RAGPipeline
 
 logger = get_logger(__name__)
 
-# Simple in-memory store (replace with PostgreSQL in production)
-_DOCUMENT_REGISTRY: dict[str, DocumentInfo] = {}
-
 
 class DocumentService:
     """Handles document upload, listing, and deletion."""
@@ -30,8 +31,8 @@ class DocumentService:
     def __init__(self, pipeline: RAGPipeline):
         self._pipeline = pipeline
 
-    def upload_document(
-        self, content: bytes, filename: str, file_size: int
+    async def upload_document(
+        self, content: bytes, filename: str, file_size: int, db: AsyncSession
     ) -> DocumentUploadResponse:
         """
         Validate, ingest, and register a document.
@@ -48,26 +49,45 @@ class DocumentService:
             filename=filename,
         )
 
-        # Register metadata
-        _DOCUMENT_REGISTRY[result.document_id] = DocumentInfo(
-            document_id=result.document_id,
+        # Register metadata in DB
+        db_doc = DocumentRecord(
+            id=result.document_id,
             filename=result.filename,
+            original_filename=filename,
             page_count=result.page_count,
             chunk_count=result.chunk_count,
-            uploaded_at=datetime.utcnow(),
             file_size_bytes=file_size,
         )
+        db.add(db_doc)
+        await db.commit()
 
         return result
 
-    def list_documents(self) -> DocumentListResponse:
+    async def list_documents(self, db: AsyncSession) -> DocumentListResponse:
         """Return all registered documents."""
-        docs = list(_DOCUMENT_REGISTRY.values())
+        result = await db.execute(select(DocumentRecord))
+        db_docs = result.scalars().all()
+        
+        docs = [
+            DocumentInfo(
+                document_id=doc.id,
+                filename=doc.filename,
+                page_count=doc.page_count,
+                chunk_count=doc.chunk_count,
+                uploaded_at=doc.uploaded_at,
+                file_size_bytes=doc.file_size_bytes,
+            )
+            for doc in db_docs
+        ]
         return DocumentListResponse(documents=docs, total=len(docs))
 
-    def delete_document(self, document_id: str) -> DocumentDeleteResponse:
+    async def delete_document(self, document_id: str, db: AsyncSession) -> DocumentDeleteResponse:
         """Delete a document from the vector store and registry."""
-        if document_id not in _DOCUMENT_REGISTRY:
+        # Query the document
+        result = await db.execute(select(DocumentRecord).where(DocumentRecord.id == document_id))
+        db_doc = result.scalar_one_or_none()
+
+        if not db_doc:
             from fastapi import HTTPException, status
 
             raise HTTPException(
@@ -75,8 +95,12 @@ class DocumentService:
                 detail=f"Document '{document_id}' not found.",
             )
 
+        # Delete vectors in Qdrant
         self._pipeline.delete_document_vectors(document_id)
-        del _DOCUMENT_REGISTRY[document_id]
+        
+        # Delete from Postgres
+        await db.delete(db_doc)
+        await db.commit()
 
         logger.info("document_deleted", document_id=document_id)
 
@@ -85,5 +109,6 @@ class DocumentService:
             message=f"Document '{document_id}' and all its vectors have been deleted.",
         )
 
-    def get_document_count(self) -> int:
-        return len(_DOCUMENT_REGISTRY)
+    async def get_document_count(self, db: AsyncSession) -> int:
+        result = await db.execute(select(func.count()).select_from(DocumentRecord))
+        return result.scalar() or 0

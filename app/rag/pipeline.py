@@ -18,6 +18,10 @@ import uuid
 
 from app.core.logging import get_logger
 from app.core.security import compute_document_id, sanitise_filename
+from app.models.database import ConversationRecord, MessageRecord
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.schemas import (
     ChatResponse,
     ConversationMessage,
@@ -35,11 +39,6 @@ from app.rag.vector_store import QdrantVectorStore
 logger = get_logger(__name__)
 
 
-# ======================================================================
-# In-memory conversation store (replace with Redis/DB for multi-user)
-# ======================================================================
-
-_CONVERSATION_STORE: dict[str, list[ConversationMessage]] = {}
 _MAX_HISTORY_TURNS = 10  # Keep last 10 user+assistant pairs
 
 
@@ -154,12 +153,13 @@ class RAGPipeline:
     # Query
     # ------------------------------------------------------------------
 
-    def query(
+    async def query(
         self,
         question: str,
         conversation_id: str | None = None,
         top_k: int | None = None,
         document_ids: list[str] | None = None,
+        db: AsyncSession = None,
     ) -> ChatResponse:
         """
         Full RAG query pipeline: question → answer with sources.
@@ -178,8 +178,24 @@ class RAGPipeline:
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
 
-        history = _CONVERSATION_STORE.get(conversation_id, [])
-        history_dicts = [{"role": m.role, "content": m.content} for m in history]
+        # Retrieve conversation history
+        stmt = select(ConversationRecord).options(selectinload(ConversationRecord.messages)).where(ConversationRecord.id == conversation_id)
+        result = await db.execute(stmt)
+        conversation = result.scalar_one_or_none()
+        
+        if not conversation:
+            conversation = ConversationRecord(id=conversation_id)
+            db.add(conversation)
+            history = []
+        else:
+            # Sort messages by ID to preserve order
+            history = sorted(conversation.messages, key=lambda m: m.id)
+            
+        # Get last N messages
+        max_messages = _MAX_HISTORY_TURNS * 2
+        recent_history = history[-max_messages:] if history else []
+
+        history_dicts = [{"role": m.role, "content": m.content} for m in recent_history]
 
         logger.info(
             "query_started",
@@ -236,11 +252,15 @@ class RAGPipeline:
         total_latency_ms = int((time.monotonic() - start) * 1000)
 
         # Persist conversation history
-        history.append(ConversationMessage(role="user", content=question))
-        history.append(ConversationMessage(role="assistant", content=gen_result.answer))
-        # Trim to max history window
-        max_messages = _MAX_HISTORY_TURNS * 2
-        _CONVERSATION_STORE[conversation_id] = history[-max_messages:]
+        user_msg = MessageRecord(conversation_id=conversation_id, role="user", content=question)
+        assistant_msg = MessageRecord(
+            conversation_id=conversation_id, 
+            role="assistant", 
+            content=gen_result.answer,
+            sources_json=[s.model_dump() for s in sources]
+        )
+        db.add_all([user_msg, assistant_msg])
+        await db.commit()
 
         logger.info(
             "query_completed",

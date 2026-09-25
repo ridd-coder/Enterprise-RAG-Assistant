@@ -37,7 +37,11 @@ The following components are fully implemented, verified with code inspection, a
   - `GET /api/metrics` — Aggregate usage statistics
 - **Application Factory (`app/main.py`):** Async lifespan manager, CORS middleware, error handling, degraded-mode startup when vector DB or OpenAI API key is unavailable, and automatic static serving of the built React frontend at `/`.
 
-### E. Frontend Application
+### E. Persistence Layer (PostgreSQL)
+- **Document Metadata Registry (`app/services/document_service.py`):** Fully integrated with SQLAlchemy AsyncModels to store document records (`DocumentRecord`).
+- **Conversation Session Persistence (`app/rag/pipeline.py`):** Chat history is persisted and retrieved seamlessly using `ConversationRecord` and `MessageRecord` inside the PostgreSQL database.
+
+### F. Frontend Application
 - **React 18 + Vite (`frontend/`):** Glassmorphic dark UI built with modular components:
   - `Dashboard.jsx`: Live system status, metrics, and architecture pipeline diagram
   - `DocumentsPage.jsx`: Drag-and-drop PDF upload and document registry management
@@ -58,10 +62,7 @@ The following components are fully implemented, verified with code inspection, a
 
 ## 2. Partially Completed Components
 
-- **Document Metadata Registry (`app/services/document_service.py`):**  
-  Currently maintains document metadata in an in-memory dictionary (`_DOCUMENT_REGISTRY`). Persistent SQLAlchemy async models are fully implemented in `app/models/database.py` (`DocumentRecord`, `ConversationRecord`, `MessageRecord`), but are not yet wired to a live PostgreSQL database.
-- **Conversation Session Persistence (`app/rag/pipeline.py`):**  
-  Uses an in-memory 10-turn sliding window (`_CONVERSATION_STORE`). Session data resets on server restart.
+*(All core components are now complete!)*
 
 ---
 

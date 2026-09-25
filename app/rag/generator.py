@@ -1,16 +1,17 @@
 """
 app/rag/generator.py
 
-LLM answer generation service using OpenAI's chat completion API.
+LLM answer generation service using Google Gemini's chat completion API.
 
 All LLM calls in the application go through this single class.
-Do not scatter OpenAI calls elsewhere.
 """
 
 import time
 from dataclasses import dataclass
 
-from openai import APIConnectionError, APIStatusError, OpenAI, RateLimitError
+from google import genai
+from google.genai import errors
+from google.genai import types
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -24,7 +25,6 @@ from app.rag.prompt import build_messages
 from app.rag.vector_store import SearchResult
 
 logger = get_logger(__name__)
-
 
 # ======================================================================
 # Exceptions
@@ -62,19 +62,16 @@ NO_CONTEXT_ANSWER = (
 
 class LLMGenerator:
     """
-    Generates answers to user questions using OpenAI's chat completion API.
-
-    Enforces grounding: if no context is available, returns the
-    NO_CONTEXT_ANSWER sentinel without calling the LLM.
+    Generates answers to user questions using Gemini API.
     """
 
     def __init__(self):
         settings = get_settings()
-        api_key = settings.require_openai_key()
-        self._client = OpenAI(api_key=api_key)
-        self._model = settings.openai_model
-        self._max_tokens = settings.openai_max_tokens
-        self._temperature = settings.openai_temperature
+        api_key = settings.require_gemini_key()
+        self._client = genai.Client(api_key=api_key)
+        self._model = settings.gemini_model
+        self._max_tokens = settings.gemini_max_tokens
+        self._temperature = settings.gemini_temperature
 
         logger.info(
             "llm_generator_initialized",
@@ -91,17 +88,6 @@ class LLMGenerator:
     ) -> GenerationResult:
         """
         Generate an answer grounded in the retrieved chunks.
-
-        If no chunks are provided (retrieval returned nothing above threshold),
-        return the NO_CONTEXT_ANSWER without hitting the LLM.
-
-        Args:
-            question: User's natural language question.
-            chunks: Retrieved document chunks from Qdrant.
-            conversation_history: Previous turns for conversational context.
-
-        Returns:
-            GenerationResult with the answer and metadata.
         """
         start_ms = time.monotonic() * 1000
 
@@ -133,10 +119,14 @@ class LLMGenerator:
             messages=len(messages),
         )
 
-        response = self._call_openai_with_retry(messages)
+        response = self._call_gemini_with_retry(messages)
 
-        answer = response.choices[0].message.content or NO_CONTEXT_ANSWER
-        tokens_used = response.usage.total_tokens if response.usage else None
+        answer = response.text or NO_CONTEXT_ANSWER
+        
+        tokens_used = None
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            tokens_used = response.usage_metadata.total_token_count
+
         elapsed = int(time.monotonic() * 1000 - start_ms)
 
         logger.info(
@@ -154,31 +144,40 @@ class LLMGenerator:
         )
 
     @retry(
-        retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+        retry=retry_if_exception_type(errors.APIError),
         wait=wait_exponential(multiplier=1, min=2, max=30),
         stop=stop_after_attempt(4),
         reraise=True,
     )
-    def _call_openai_with_retry(self, messages: list):
-        """Call the OpenAI chat completion API with retry on transient errors."""
+    def _call_gemini_with_retry(self, messages: list):
+        """Call the Gemini API with retry on transient errors."""
         try:
-            return self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                max_tokens=self._max_tokens,
+            # Map OpenAI format to Gemini format
+            system_instruction = None
+            gemini_contents = []
+            
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_instruction = msg["content"]
+                else:
+                    role = "user" if msg["role"] == "user" else "model"
+                    gemini_contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+            
+            config = types.GenerateContentConfig(
                 temperature=self._temperature,
+                max_output_tokens=self._max_tokens,
             )
-        except RateLimitError:
-            logger.warning("openai_rate_limited_generation")
-            raise
-        except APIConnectionError:
-            logger.warning("openai_connection_error_generation")
-            raise
-        except APIStatusError as exc:
-            logger.error(
-                "openai_api_error_generation",
-                status=exc.status_code,
+            if system_instruction:
+                config.system_instruction = system_instruction
+                
+            return self._client.models.generate_content(
+                model=self._model,
+                contents=gemini_contents,
+                config=config,
             )
-            raise GenerationError(
-                f"OpenAI API returned status {exc.status_code}: {exc.message}"
-            ) from exc
+        except errors.APIError as exc:
+            logger.error("gemini_api_error_generation", detail=str(exc))
+            raise GenerationError(f"Gemini API error: {exc}") from exc
+        except Exception as exc:
+            logger.exception("gemini_unexpected_error", error=str(exc))
+            raise GenerationError(f"Unexpected generation error: {exc}") from exc

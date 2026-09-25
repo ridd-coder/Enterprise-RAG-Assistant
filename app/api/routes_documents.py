@@ -19,6 +19,8 @@ from app.models.schemas import (
 )
 from app.rag.document_loader import CorruptedDocumentError, DocumentLoadError, EmptyDocumentError
 from app.services.document_service import DocumentService
+from app.api.deps import get_db_session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -47,6 +49,7 @@ def get_document_service() -> DocumentService:
 async def upload_document(
     file: UploadFile = File(...),
     service: DocumentService = Depends(get_document_service),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DocumentUploadResponse:
     """
     Upload a PDF document for ingestion into the RAG knowledge base.
@@ -70,10 +73,11 @@ async def upload_document(
     )
 
     try:
-        result = service.upload_document(
+        result = await service.upload_document(
             content=content,
             filename=file.filename or "unknown.pdf",
             file_size=len(content),
+            db=db,
         )
         return result
 
@@ -107,9 +111,10 @@ async def upload_document(
 )
 async def list_documents(
     service: DocumentService = Depends(get_document_service),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DocumentListResponse:
     """Return metadata for all documents currently in the knowledge base."""
-    return service.list_documents()
+    return await service.list_documents(db)
 
 
 @router.delete(
@@ -120,8 +125,9 @@ async def list_documents(
 async def delete_document(
     document_id: str,
     service: DocumentService = Depends(get_document_service),
+    db: AsyncSession = Depends(get_db_session),
 ) -> DocumentDeleteResponse:
     """
     Remove a document and all its associated vectors from Qdrant.
     """
-    return service.delete_document(document_id)
+    return await service.delete_document(document_id, db)

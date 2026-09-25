@@ -68,6 +68,15 @@ async def lifespan(app: FastAPI):
     from app.rag.pipeline import RAGPipeline
     from app.services.chat_service import ChatService
     from app.services.document_service import DocumentService
+    from app.models.database import create_tables
+    from app.api.deps import engine
+    
+    # Initialize database tables
+    try:
+        await create_tables(engine)
+        logger.info("database_tables_created")
+    except Exception as exc:
+        logger.error("database_init_failed", error=str(exc))
 
     if _APP_STATE.get("pipeline") is None:
         try:

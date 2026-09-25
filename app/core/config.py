@@ -36,23 +36,23 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="change-me-in-production")
 
     # ------------------------------------------------------------------
-    # OpenAI
+    # Gemini
     # ------------------------------------------------------------------
-    openai_api_key: str = Field(
+    gemini_api_key: str = Field(
         default="",
-        description="OpenAI API key — required for embedding and generation",
+        description="Gemini API key — required for embedding and generation",
     )
-    openai_model: str = Field(default="gpt-4o-mini")
-    openai_embedding_model: str = Field(default="text-embedding-3-small")
-    openai_max_tokens: int = Field(default=1024)
-    openai_temperature: float = Field(default=0.0)
+    gemini_model: str = Field(default="gemini-3.8-flash")
+    gemini_embedding_model: str = Field(default="gemini-embedding-2")
+    gemini_max_tokens: int = Field(default=1024)
+    gemini_temperature: float = Field(default=0.0)
 
-    def require_openai_key(self) -> str:
-        """Validate and return OpenAI API key, raising ConfigurationError if missing."""
-        key = self.openai_api_key.strip()
+    def require_gemini_key(self) -> str:
+        """Validate and return Gemini API key, raising ConfigurationError if missing."""
+        key = self.gemini_api_key.strip()
         if not key:
             raise ConfigurationError(
-                "OPENAI_API_KEY is not configured. Please set OPENAI_API_KEY in your .env "
+                "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your .env "
                 "file or as an environment variable to enable embedding and generation."
             )
         return key
@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     # Document processing
     # ------------------------------------------------------------------
     max_file_size_mb: int = Field(default=50)
-    allowed_extensions: list[str] = Field(default=["pdf"])
+    allowed_extensions_str: str = Field(default="pdf", alias="allowed_extensions")
     chunk_size: int = Field(default=1000)
     chunk_overlap: int = Field(default=200)
     data_dir: str = Field(default="data/documents")
@@ -93,23 +93,17 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # CORS
     # ------------------------------------------------------------------
-    cors_origins: list[str] = Field(default=["http://localhost:3000", "http://localhost:5173"])
+    cors_origins_str: str = Field(
+        default="http://localhost:3000,http://localhost:5173", alias="cors_origins"
+    )
 
-    @field_validator("allowed_extensions", mode="before")
-    @classmethod
-    def parse_extensions(cls, v: str | list) -> list:
-        """Accept comma-separated string or list."""
-        if isinstance(v, str):
-            return [ext.strip().lower() for ext in v.split(",")]
-        return v
+    @property
+    def allowed_extensions(self) -> list[str]:
+        return [ext.strip().lower() for ext in self.allowed_extensions_str.split(",")]
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list) -> list:
-        """Accept comma-separated string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins_str.split(",")]
 
     @property
     def max_file_size_bytes(self) -> int:

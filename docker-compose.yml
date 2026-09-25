@@ -27,7 +27,7 @@ services:
       - ./data:/app/data
     depends_on:
       qdrant:
-        condition: service_healthy
+        condition: service_started
       postgres:
         condition: service_healthy
     healthcheck:
@@ -49,12 +49,6 @@ services:
       - "6334:6334"
     volumes:
       - qdrant_storage:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
 
   # ----------------------------------------------------------
   # PostgreSQL — document metadata / conversation history

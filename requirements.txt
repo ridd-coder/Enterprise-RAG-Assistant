@@ -18,13 +18,13 @@ pydantic-settings==2.3.1
 # ---------------------------
 # OpenAI
 # ---------------------------
-openai==1.30.5
+google-genai==0.3.0
 
 # ---------------------------
 # LangChain
 # ---------------------------
 langchain==0.2.5
-langchain-openai==0.1.8
+
 langchain-community==0.2.5
 langchain-core==0.2.9
 

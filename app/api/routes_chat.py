@@ -14,6 +14,8 @@ from app.models.schemas import ChatRequest, ChatResponse, MetricsResponse
 from app.rag.generator import GenerationError
 from app.rag.vector_store import VectorStoreError
 from app.services.chat_service import ChatService
+from app.api.deps import get_db_session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["Chat"])
@@ -41,6 +43,7 @@ def get_chat_service() -> ChatService:
 async def chat(
     request: ChatRequest,
     service: ChatService = Depends(get_chat_service),
+    db: AsyncSession = Depends(get_db_session),
 ) -> ChatResponse:
     """
     Ask a natural-language question against the document knowledge base.
@@ -51,7 +54,7 @@ async def chat(
     - If no relevant context is found, returns an explicit "not found" message.
     """
     try:
-        return service.ask(request)
+        return await service.ask(request, db)
     except VectorStoreError as exc:
         logger.error("chat_vector_store_error", error=str(exc))
         raise HTTPException(
@@ -77,7 +80,9 @@ async def chat(
     response_model=MetricsResponse,
     summary="Get application usage metrics",
 )
-async def get_metrics() -> MetricsResponse:
+async def get_metrics(
+    db: AsyncSession = Depends(get_db_session),
+) -> MetricsResponse:
     """Return basic usage metrics for the dashboard."""
     import time
 
@@ -86,7 +91,7 @@ async def get_metrics() -> MetricsResponse:
     state = get_app_state()
     uptime = time.monotonic() - state.get("start_time", time.monotonic())
     doc_service = state.get("document_service")
-    total_docs = doc_service.get_document_count() if doc_service else 0
+    total_docs = await doc_service.get_document_count(db) if doc_service else 0
 
     return MetricsResponse(
         total_documents=total_docs,

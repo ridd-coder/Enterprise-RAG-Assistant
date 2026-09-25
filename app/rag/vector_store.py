@@ -20,6 +20,7 @@ from qdrant_client.http import models as qdrant_models
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.rag.chunker import DocumentChunk
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = get_logger(__name__)
 
@@ -90,8 +91,7 @@ class QdrantVectorStore:
 
         try:
             client_kwargs: dict[str, Any] = {
-                "host": settings.qdrant_host,
-                "port": settings.qdrant_port,
+                "url": f"http://{settings.qdrant_host}:{settings.qdrant_port}",
             }
             if settings.qdrant_api_key:
                 client_kwargs["api_key"] = settings.qdrant_api_key
@@ -99,8 +99,7 @@ class QdrantVectorStore:
             self._client = QdrantClient(**client_kwargs)
             logger.info(
                 "qdrant_client_initialized",
-                host=settings.qdrant_host,
-                port=settings.qdrant_port,
+                url=client_kwargs["url"],
                 collection=self._collection,
             )
         except Exception as exc:
@@ -112,6 +111,12 @@ class QdrantVectorStore:
     # Collection management
     # ------------------------------------------------------------------
 
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(5),
+        reraise=True,
+    )
     def initialize_collection(self) -> None:
         """
         Create the collection if it does not already exist.

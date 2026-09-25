@@ -1,7 +1,7 @@
 """
 app/rag/embeddings.py
 
-Embedding service backed by OpenAI's text-embedding API.
+Embedding service backed by Google Gemini's text-embedding API.
 
 Features:
 - Decoupled from the rest of the application (swap model via config)
@@ -10,7 +10,8 @@ Features:
 - Clean error logging — API key is NEVER logged
 """
 
-from openai import APIConnectionError, APIStatusError, OpenAI, RateLimitError
+from google import genai
+from google.genai import errors
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -40,17 +41,17 @@ class EmbeddingError(Exception):
 
 class EmbeddingService:
     """
-    Generates vector embeddings using OpenAI's embedding API.
+    Generates vector embeddings using Gemini's embedding API.
 
-    This class is the single place in the application that calls OpenAI
-    for embeddings.  Swap the model by changing OPENAI_EMBEDDING_MODEL.
+    This class is the single place in the application that calls Gemini
+    for embeddings.
     """
 
     def __init__(self):
         settings = get_settings()
-        api_key = settings.require_openai_key()
-        self._client = OpenAI(api_key=api_key)
-        self._model = settings.openai_embedding_model
+        api_key = settings.require_gemini_key()
+        self._client = genai.Client(api_key=api_key)
+        self._model = settings.gemini_embedding_model
         self._batch_size = settings.embedding_batch_size
 
         logger.info(
@@ -63,11 +64,9 @@ class EmbeddingService:
     def vector_size(self) -> int:
         """Return the dimensionality of the embedding model."""
         sizes = {
-            "text-embedding-3-small": 1536,
-            "text-embedding-3-large": 3072,
-            "text-embedding-ada-002": 1536,
+            "gemini-embedding-2": 3072,
         }
-        return sizes.get(self._model, 1536)
+        return sizes.get(self._model, 3072)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """
@@ -114,44 +113,33 @@ class EmbeddingService:
     def embed_query(self, text: str) -> list[float]:
         """
         Embed a single query string.
-
-        Slightly different from document embedding in OpenAI's API
-        (query_embedding vs document_embedding) but the model is the same.
         """
         result = self.embed_texts([text])
         return result[0]
 
     @retry(
-        retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+        retry=retry_if_exception_type(errors.APIError),
         wait=wait_exponential(multiplier=1, min=2, max=30),
         stop=stop_after_attempt(5),
         reraise=True,
     )
     def _embed_batch_with_retry(self, batch: list[str]) -> list[list[float]]:
         """
-        Call the OpenAI embedding API with automatic retry.
+        Call the Gemini embedding API with automatic retry.
 
         Note: API key is intentionally excluded from all log messages.
         """
         try:
-            response = self._client.embeddings.create(
-                input=batch,
+            response = self._client.models.embed_content(
                 model=self._model,
+                contents=batch,
             )
-            # Sort by index to guarantee order matches input
-            sorted_data = sorted(response.data, key=lambda e: e.index)
-            return [item.embedding for item in sorted_data]
+            # Response.embeddings is a list of ContentEmbedding, each with .values
+            return [item.values for item in response.embeddings]
 
-        except RateLimitError as exc:
-            logger.warning("openai_rate_limited", detail=str(exc))
-            raise
-        except APIConnectionError as exc:
-            logger.warning("openai_connection_error", detail=str(exc))
-            raise
-        except APIStatusError as exc:
-            # Non-retryable API errors
-            logger.error("openai_api_error", status=exc.status_code, detail=exc.message)
-            raise EmbeddingError(f"OpenAI embedding API returned status {exc.status_code}") from exc
+        except errors.APIError as exc:
+            logger.error("gemini_api_error", detail=str(exc))
+            raise EmbeddingError(f"Gemini API error: {exc}") from exc
         except Exception as exc:
             logger.exception("embedding_unexpected_error", error=str(exc))
             raise EmbeddingError(f"Unexpected embedding error: {exc}") from exc
