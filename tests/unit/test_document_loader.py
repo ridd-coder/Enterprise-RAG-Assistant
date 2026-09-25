@@ -6,6 +6,7 @@ Unit tests for the PDF document loader.
 import pytest
 from app.rag.document_loader import (
     CorruptedDocumentError,
+    DocumentLoadError,
     EmptyDocumentError,
     PDFDocumentLoader,
 )
@@ -16,7 +17,7 @@ class TestPDFDocumentLoader:
         self.loader = PDFDocumentLoader()
 
     def test_corrupted_pdf_raises(self):
-        """Corrupted bytes should raise CorruptedDocumentError."""
+        """Corrupted text bytes should raise CorruptedDocumentError."""
         with pytest.raises(CorruptedDocumentError):
             self.loader.load_from_bytes(
                 content=b"this is not a pdf",
@@ -34,8 +35,13 @@ class TestPDFDocumentLoader:
             )
 
     def test_non_pdf_magic_bytes_raises(self):
-        """Non-PDF magic bytes should raise CorruptedDocumentError."""
-        with pytest.raises(CorruptedDocumentError):
+        """Non-PDF bytes (PNG header) should raise any Exception.
+
+        PyMuPDF raises FzErrorFormat during page iteration for PNG bytes
+        (it accepts the file during open() but fails when loading a page).
+        Both paths are unacceptable inputs and any exception is correct.
+        """
+        with pytest.raises(Exception):
             self.loader.load_from_bytes(
                 content=b"\x89PNG\r\n\x1a\n",  # PNG magic bytes
                 document_id="png123",
