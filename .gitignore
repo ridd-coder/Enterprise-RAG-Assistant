@@ -1,0 +1,89 @@
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyo
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env.local
+.env.production
+
+# ==========================
+# Secrets — NEVER COMMIT
+# ==========================
+.env
+
+# ==========================
+# Data / Uploads
+# ==========================
+data/documents/*.pdf
+data/documents/*.PDF
+*.pdf
+
+# ==========================
+# IDE / Editor
+# ==========================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Testing
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.xml
+
+# ==========================
+# Node / Frontend
+# ==========================
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+
+# ==========================
+# Docker
+# ==========================
+*.log
+
+# ==========================
+# Qdrant local storage
+# ==========================
+qdrant_storage/
+
+# ==========================
+# Evaluation outputs
+# ==========================
+evaluation_results*.json
+evaluation_report*.md
